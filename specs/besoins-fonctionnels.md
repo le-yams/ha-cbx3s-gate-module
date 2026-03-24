@@ -7,10 +7,16 @@ Module domotique à concevoir pour piloter et superviser un portail battant équ
 ## Architecture d'intégration
 
 ```
-Portail (CBX 3S io) <--filaire--> Module domotique <--WiFi/MQTT--> Home Assistant
+Boutons externes ──filaire──> Module domotique <──filaire──> Portail (CBX 3S io)
+                                    │
+                                WiFi/MQTT
+                                    │
+                              Home Assistant
 ```
 
-- Le module communique avec la Control Box via ses **bornes filaires** (contacts secs, 24V DC)
+- Le module est le **point de câblage unique** entre la CBX et le monde extérieur
+- Toutes les commandes (MQTT ou boutons physiques externes) passent par le module, qui relaie les contacts secs vers la CBX
+- Cela minimise les interventions sur la Control Box : un seul câblage initial sur les bornes 30/31/32
 - Le module communique avec Home Assistant via **MQTT** sur le réseau WiFi local
 - Le protocole radio io-homecontrol de Somfy n'est **pas** utilisé par le module
 
@@ -51,7 +57,15 @@ Portail (CBX 3S io) <--filaire--> Module domotique <--WiFi/MQTT--> Home Assistan
 - **Stockage** : Les paramètres sont sauvegardés en flash (NVS) et persistent aux redémarrages
 - **Sécurité** : L'AP n'est actif que sur action physique ou premier démarrage (pas d'AP permanent)
 
-### F05 — Connaître l'état du portail
+### F05 — Relayer des commandes externes (boutons physiques)
+
+- **Description** : Le module dispose de borniers d'entrée permettant de brancher des commandes physiques externes (boutons poussoirs, interrupteurs) pour l'ouverture totale et piéton
+- **Entrées** : 2 borniers contact sec sur le module (1 ouverture totale, 1 ouverture piéton)
+- **Comportement** : Lorsqu'un contact externe se ferme, le module relaie l'impulsion vers la borne CBX correspondante (30+31 ou 32+31), de la même manière qu'une commande MQTT
+- **Intérêt** : Le module est le point de câblage unique — on n'intervient sur la CBX qu'une seule fois, à l'installation
+- **Note** : La détection du déclenchement d'une commande (F07/F08) ne repose pas sur ces entrées mais sur le retour d'état de la CBX (sortie auxiliaire bornes 7/8), qui confirme que la commande a bien été exécutée
+
+### F06 — Connaître l'état du portail
 
 - **Description** : Home Assistant connaît l'état courant du portail
 - **États possibles** :
@@ -69,15 +83,15 @@ Portail (CBX 3S io) <--filaire--> Module domotique <--WiFi/MQTT--> Home Assistan
 
 ## Optionnel — Fonctionnalités souhaitées
 
-### F06 — Notifier le déclenchement d'une ouverture totale
+### F07 — Notifier le déclenchement d'une ouverture totale
 
 - **Description** : Lorsque l'ouverture totale est déclenchée (par n'importe quelle source : télécommande, clavier, module, etc.), Home Assistant est informé
-- **Difficulté** : La CBX 3S io ne fournit pas d'information sur la source de la commande. La détection ne peut se faire qu'indirectement via l'analyse de l'état portail (F05) combinée au fait que le module n'a pas émis la commande lui-même
+- **Difficulté** : La CBX 3S io ne fournit pas d'information sur la source de la commande. La détection ne peut se faire qu'indirectement via l'analyse de l'état portail (F06) combinée au fait que le module n'a pas émis la commande lui-même
 - **Approche possible** : Si le portail passe en mouvement sans commande du module → notification "ouverture externe détectée". La distinction total/piéton pourrait être déduite du comportement (2 vantaux vs 1)
 
-### F07 — Notifier le déclenchement d'une ouverture piéton
+### F08 — Notifier le déclenchement d'une ouverture piéton
 
-- Même principe que F06, mais pour l'ouverture piéton
+- Même principe que F07, mais pour l'ouverture piéton
 - La distinction entre total et piéton depuis la sortie auxiliaire P15=1 reste à étudier (le signal est-il différent ?)
 
 ---
@@ -89,7 +103,7 @@ Portail (CBX 3S io) <--filaire--> Module domotique <--WiFi/MQTT--> Home Assistan
 | Alimentation depuis la CBX (24V bornes 19/20) | Le module doit fonctionner en 24V → régulateur buck vers 3.3V ou 5V |
 | Fonctionnement sur batterie de secours | Le module doit continuer à opérer quand le 230V est coupé (F03) |
 | WiFi requis pour MQTT | Le MCU doit avoir un module WiFi intégré (ESP32 probable) |
-| Commandes par contact sec | Le module a besoin d'au moins 2 relais (ouverture totale + piéton) |
+| Commandes par contact sec | Le module a besoin d'au moins 2 relais (ouverture totale + piéton) et 2 entrées contact sec (commandes externes) |
 | Lecture état portail (P15=1) | Le module doit lire un contact sec (GPIO avec pull-up) et détecter le clignotement |
 | Sécurité électrique | Isolation entre 230V et TBTS si détection secteur sur bornes 1/2 |
 
