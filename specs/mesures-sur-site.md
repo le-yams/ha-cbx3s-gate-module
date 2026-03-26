@@ -63,6 +63,7 @@ Multimètre en **DC**, pointes sur borne 19 (+) et borne 20 (−/GND).
 
 (*) Pour passer sur batterie : couper le disjoncteur dédié au portail. Vérifier que la CBX reste alimentée (afficheur allumé, code Hc1 ou Hu1).
 
+
 ### Identification du type de batterie
 
 Quand le 230V est coupé, l'afficheur indique :
@@ -103,28 +104,15 @@ Déclencher une ouverture totale et observer le contact 7/8 :
 
 ### Comparaison ouverture totale vs piéton
 
-| Test                    | Comportement du contact 7/8                            |
-|-------------------------|--------------------------------------------------------|
-| Ouverture **totale**    | __________________________________________________________|
-| Ouverture **piéton**    | __________________________________________________________|
-| Différence ? (oui/non)  | __________________________________________________________|
+| Test                    | Comportement du contact 7/8 |
+|-------------------------|-----------------------------|
+| Ouverture **totale**    | ____________________________|
+| Ouverture **piéton**    | ____________________________|
+| Différence ? (oui/non)  | ____________________________|
 
 ---
 
-## 4. Couverture WiFi
-
-Avec un téléphone, vérifier la réception WiFi au niveau du boîtier de la CBX.
-
-| Mesure                                          | Relevé          |
-|-------------------------------------------------|:---------------:|
-| Réseau WiFi domestique visible ? (oui / non)    |   __________    |
-| Niveau de signal (barres ou dBm)                |   __________    |
-| Distance approximative au point d'accès WiFi    |   __________ m  |
-| Obstacles (murs, métal, etc.)                   |   __________    |
-
----
-
-## 5. Modification de P15 (si nécessaire)
+## 4. Modification de P15 (si nécessaire)
 
 **Uniquement si P15 n'est pas à 1** et que tu souhaites le modifier sur place.
 
@@ -136,13 +124,3 @@ Avec un téléphone, vérifier la réception WiFi au niveau du boîtier de la CB
 6. Attendre ~30s pour sortir du mode paramétrage
 
 > Après modification de P15, refaire un cycle d'ouverture/fermeture pour vérifier le comportement de la sortie 7/8.
-
----
-
-## 6. Observations complémentaires
-
-| Observation                                     | Notes           |
-|-------------------------------------------------|-----------------|
-| Espace disponible dans/autour du boîtier        | _______________________________________________________________|
-| Accès aux borniers (facilité de câblage)        | _______________________________________________________________|
-| Remarques diverses                              | _______________________________________________________________|
