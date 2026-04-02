@@ -14,9 +14,16 @@ Ce document recense les options techniques envisagées pour réaliser les foncti
 | STM32 + module WiFi | Meilleur ADC, plus de GPIO, industriel | Plus complexe, coût supérieur, 2 composants |
 | Arduino + shield WiFi | 5V natif (simplifie relais) | Encombrant, écosystème WiFi moins mature |
 
-**Tendance** : ESP32 est le candidat naturel. Compatible ESPHome pour une intégration directe Home Assistant/MQTT.
+**Décision** : **Seeed Studio XIAO ESP32C3** (déjà en stock).
 
-**Statut** : À arbitrer.
+- ESP32-C3 RISC-V single-core 160 MHz, 400 KB SRAM, 4 MB flash
+- WiFi 802.11 b/g/n + BLE 5.0
+- 11 GPIO (8 libres + 3 strapping), 4 ADC (3 fiables sur ADC1)
+- Format ultra-compact : 21 × 17.8 mm
+- Deep sleep 44 µA, sortie 3.3V / 500 mA
+- Prix ~5 €
+
+**Statut** : ✅ Décidé.
 
 ---
 
@@ -132,8 +139,43 @@ Avantage : détection franche (présent/absent). Inconvénient : manipulation ha
 | État portail (P15=1) | 7 + 8 | Contact sec (lecture) | 1 entrée digitale + pull-up |
 | Alimentation module | 19 + 20 | 24V DC | Via buck → 3.3V |
 | Détection secteur | 1/2 ou 19/20 | Selon option | 1 entrée (digitale ou ADC) |
+| Boutons externes total/piéton | 30/32 + 31 | Contact sec | Aucun (câblage direct) |
+| Bouton config AP (F04) | — | Bouton poussoir | Bouton BOOT (GPIO9) |
 
-**Total GPIO minimum** : 2 sorties + 2 entrées = 4 GPIO (largement dans les capacités d'un ESP32).
+### Câblage des boutons externes (F05)
+
+Les boutons physiques externes sont câblés **en parallèle des relais**, directement sur les bornes CBX :
+
+```
+Borne 31 (commun) ──┬── Relais total NO  ──┬── Borne 30
+                     └── Bouton total     ──┘
+
+Borne 31 (commun) ──┬── Relais piéton NO ──┬── Borne 32
+                     └── Bouton piéton    ──┘
+```
+
+Avantages :
+- Pas de GPIO consommé (un bouton poussoir est un contact sec, comme le relais)
+- Fonctionne même si le MCU est hors service (circuit purement électrique)
+- La détection de commande externe (F07/F08) repose sur l'analyse du retour P15, pas sur la lecture des boutons
+
+### Allocation GPIO — XIAO ESP32C3
+
+| GPIO | Pin XIAO | Affectation | Fonction |
+|------|----------|-------------|----------|
+| GPIO3 | D1 | Relais total | F01 — sortie digitale |
+| GPIO4 | D2 | Relais piéton | F02 — sortie digitale |
+| GPIO5 | D3/A3 | Détection secteur | F03 — entrée ADC ou digitale |
+| GPIO6 | D4 | État portail | F06 — entrée digitale + pull-up |
+| GPIO9 | D9 | Bouton config AP | F04 — bouton BOOT réutilisé |
+| GPIO7 | D5 | *Libre* | |
+| GPIO21 | D6 | *Libre* | |
+| GPIO20 | D7 | *Libre* | |
+| GPIO10 | D10 | *Libre* | |
+| GPIO2 | D0 | *Libre (strapping)* | |
+| GPIO8 | D8 | *Libre (strapping)* | |
+
+**Total : 5 GPIO utilisés, 4 libres sans contrainte, 2 libres avec précautions (strapping).**
 
 ---
 
@@ -156,9 +198,9 @@ Avantage : détection franche (présent/absent). Inconvénient : manipulation ha
 
 | # | Décision | Dépend de | Priorité |
 |---|----------|-----------|----------|
-| D1 | Choix MCU | — | Haute |
+| D1 | ~~Choix MCU~~ → **XIAO ESP32C3** | — | ✅ Décidé |
 | D2 | Méthode détection secteur/batterie | Mesures sur site | Haute |
-| D3 | Compatibilité module relais avec 3.3V | D1 | Moyenne |
+| D3 | Compatibilité module relais avec 3.3V | ✅ D1 | Moyenne |
 | D4 | Fréquence clignotement P15=1 | Mesure sur site | Moyenne |
 | D5 | Distinction total/piéton via P15 | Mesure sur site | Basse |
 

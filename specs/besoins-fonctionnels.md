@@ -57,13 +57,14 @@ Boutons externes ──filaire──> Module domotique <──filaire──> Por
 - **Stockage** : Les paramètres sont sauvegardés en flash (NVS) et persistent aux redémarrages
 - **Sécurité** : L'AP n'est actif que sur action physique ou premier démarrage (pas d'AP permanent)
 
-### F05 — Relayer des commandes externes (boutons physiques)
+### F05 — Commandes externes (boutons physiques)
 
-- **Description** : Le module dispose de borniers d'entrée permettant de brancher des commandes physiques externes (boutons poussoirs, interrupteurs) pour l'ouverture totale et piéton
-- **Entrées** : 2 borniers contact sec sur le module (1 ouverture totale, 1 ouverture piéton)
-- **Comportement** : Lorsqu'un contact externe se ferme, le module relaie l'impulsion vers la borne CBX correspondante (30+31 ou 32+31), de la même manière qu'une commande MQTT
-- **Intérêt** : Le module est le point de câblage unique — on n'intervient sur la CBX qu'une seule fois, à l'installation
-- **Note** : La détection du déclenchement d'une commande (F07/F08) ne repose pas sur ces entrées mais sur le retour d'état de la CBX (sortie auxiliaire bornes 7/8), qui confirme que la commande a bien été exécutée
+- **Description** : Des boutons poussoirs externes permettent de commander l'ouverture totale et piéton
+- **Câblage** : Les boutons sont câblés **en parallèle des relais**, directement sur les bornes CBX (30+31 et 32+31). Un bouton poussoir est un contact sec, exactement comme un relais — le câblage parallèle fonctionne nativement
+- **Pas de GPIO nécessaire** : Le circuit est purement électrique, indépendant du MCU
+- **Résilience** : Les boutons fonctionnent même si le MCU est hors service (crash, mise à jour, etc.)
+- **Intérêt** : Le module reste le point de câblage unique — les borniers du module offrent un point de raccordement pratique pour les boutons, sans nécessiter de câblage supplémentaire sur la CBX
+- **Note** : La détection du déclenchement d'une commande externe (F07/F08) repose sur le retour d'état de la CBX (sortie auxiliaire bornes 7/8), pas sur la lecture des boutons
 
 ### F06 — Connaître l'état du portail
 
