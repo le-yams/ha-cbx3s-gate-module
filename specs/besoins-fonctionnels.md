@@ -107,6 +107,7 @@ Boutons externes ──filaire──> Module domotique <──filaire──> Por
 | Commandes par contact sec | Le module a besoin d'au moins 2 relais (ouverture totale + piéton) et 2 entrées contact sec (commandes externes) |
 | Lecture état portail (P15=1) | Le module doit lire un contact sec (GPIO avec pull-up) et détecter le clignotement |
 | Sécurité électrique | Isolation entre 230V et TBTS si détection secteur sur bornes 1/2 |
+| Paramètre CBX P37=0 obligatoire | Le mode cycle total/piéton est requis pour F02 — en P37=1, les bornes 30/32 deviennent ouverture/fermeture et la commande piéton est impossible |
 
 ---
 
