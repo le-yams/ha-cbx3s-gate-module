@@ -29,19 +29,59 @@ Ce document recense les options techniques envisagées pour réaliser les foncti
 
 ## Commande du portail (F01, F02)
 
-**Principe** : Fermeture brève (~0.5–1s) d'un contact sec entre bornes 30+31 (total) ou 32+31 (piéton).
+**Principe** : Fermeture brève (~0,5-1 s) d'un contact sec entre bornes 30+31 (total) ou 32+31 (piéton).
 
-**Solution retenue** : 2 relais pilotés par GPIO du MCU.
+**Solution retenue** : 2 photo-MOSFET (SSR opto-isolés) pilotés directement par GPIO du XIAO ESP32-C3.
 
-| Option | Pour | Contre |
-|--------|------|--------|
-| Module relais 2 canaux (type SRD-05VDC) | Simple, isolé, fiable | Encombrant, consomme ~70mA par relais |
-| Relais reed ou SSR | Compact | Moins courant en hobby |
-| Optocoupleur + MOSFET | Ultra compact, silencieux | Contact sec = pas de tension à commuter, relais mécanique plus direct |
+### Pourquoi photo-MOSFET plutôt que module relais mécanique
 
-**Tendance** : Module 2 relais, simple et éprouvé. Attention : si MCU en 3.3V, vérifier la compatibilité du module relais (certains nécessitent 5V sur la commande).
+| Critère | Module relais 5 V | Photo-MOSFET (AQY21x, TLP241A) |
+|---------|-------------------|--------------------------------|
+| Compatibilité 3,3 V | Selon modèle, à valider (dual supply ou actif bas) | **Native** (LED Vf ~1,2 V, 3-5 mA) |
+| Conso pendant commande | ~70 mA par bobine (140 mA pour 2) | ~3 mA par LED (6 mA pour 2) |
+| Conso au repos | 0 | 0 |
+| Format | ~15×17×19 mm par canal + module sur broches | SOP-4 (3,9×4,9 mm) CMS |
+| Bruit | Clic mécanique | Silencieux |
+| Durée de vie | ~100 k cycles | Millions de cycles (semi-conducteur) |
+| Isolation galvanique | Oui (si opto en amont) | Oui (intrinsèque) |
 
-**Statut** : Quasi décidé (module relais), à confirmer avec le choix MCU.
+Le photo-MOSFET gagne sur tous les critères dès lors qu'on produit un PCB custom (ce qui est de toute façon nécessaire pour le buck + super-cap + ESP32). L'économie d'énergie (×20) est notable vu le budget super-cap (cf. D6).
+
+### Composants candidats
+
+| Référence | V_off | I_on max | R_on | Isolation | Boîtier | Prix |
+|-----------|-------|----------|------|-----------|---------|------|
+| **TLP241A** (Toshiba) | 60 V | 1 A | 0,6 Ω | 2500 Vrms | SOP-4 | ~2 € |
+| AQY211EH (Panasonic) | 40 V | 2 A | 0,5 Ω | 1500 Vrms | SOP-4 | ~2 € |
+| AQY210EH (Panasonic) | 60 V | 1 A | 0,8 Ω | 1500 Vrms | SOP-4 | ~2 € |
+
+**Choix de référence : TLP241A** — meilleure isolation, marge large sur V_off. Les trois sont largement sur-dimensionnés pour l'usage (on commute quelques mA sous ~24 V max côté CBX).
+
+### Câblage côté GPIO
+
+```
+GPIO3 ──[R = 330-470 Ω]── LED_anode(TLP241A) ── LED_cathode ── GND
+                                   │
+                          sortie MOSFET ──── Borne 30 (total)
+                                   │
+                          sortie MOSFET ──── Borne 31 (commun)
+```
+
+- Résistance de limitation : $R = (V_{GPIO} - V_F) / I_{LED}$ = (3,3 − 1,17) / 5 mA ≈ 430 Ω → choisir **470 Ω** (standard E12, marge)
+- Courant GPIO : 4,5 mA → très en-deçà de la limite 40 mA de l'ESP32-C3
+- Pas de pull-up externe nécessaire côté commande
+
+### Vérification à faire sur site
+
+Avant de figer le choix TLP241A :
+
+- Mesurer la **tension en circuit ouvert** entre les bornes 30 et 31 (CBX au repos)
+- Mesurer le **courant traversant** quand un bouton externe ferme le contact (shunt avec résistance connue, puis calculer)
+- Vérifier que V ≤ 60 V et I ≤ 1 A (cas nominal probable : V ≈ 5-24 V, I < 20 mA)
+
+Si jamais la CBX présente une tension ou un courant inattendu, bascule possible vers AQY211EH (2 A au lieu de 1 A).
+
+**Statut** : ✅ Décidé → photo-MOSFET TLP241A (référence), caractéristiques contact CBX à mesurer sur site pour confirmation.
 
 ---
 
@@ -257,8 +297,8 @@ Buck-boost candidat : **TPS63020** (0,5-5,5 V in, 1,2-5,5 V out, 96 % de rendeme
 
 | Fonction | Bornes CBX | Type signal | GPIO MCU |
 |----------|-----------|-------------|----------|
-| Commande ouverture totale | 30 + 31 | Contact sec (relais) | 1 sortie digitale |
-| Commande ouverture piéton | 32 + 31 | Contact sec (relais) | 1 sortie digitale |
+| Commande ouverture totale | 30 + 31 | Contact sec (photo-MOSFET TLP241A) | 1 sortie digitale via R = 470 Ω |
+| Commande ouverture piéton | 32 + 31 | Contact sec (photo-MOSFET TLP241A) | 1 sortie digitale via R = 470 Ω |
 | État portail (P15=1) | 7 + 8 | Contact sec (lecture) | 1 entrée digitale + pull-up |
 | Alimentation module | 19 + 20 | 24V DC (secteur uniquement — 0V sur batterie) | Buck 24→5V + super-cap 3F/5,5V + buck-boost 5→3,3V (voir D6) |
 | Détection secteur | 1/2 ou 19/20 | Selon option | 1 entrée (digitale ou ADC) |
@@ -267,18 +307,18 @@ Buck-boost candidat : **TPS63020** (0,5-5,5 V in, 1,2-5,5 V out, 96 % de rendeme
 
 ### Câblage des boutons externes (F05)
 
-Les boutons physiques externes sont câblés **en parallèle des relais**, directement sur les bornes CBX :
+Les boutons physiques externes sont câblés **en parallèle des photo-MOSFET**, directement sur les bornes CBX :
 
 ```
-Borne 31 (commun) ──┬── Relais total NO  ──┬── Borne 30
-                     └── Bouton total     ──┘
+Borne 31 (commun) ──┬── Photo-MOSFET total  ──┬── Borne 30
+                     └── Bouton total         ──┘
 
-Borne 31 (commun) ──┬── Relais piéton NO ──┬── Borne 32
-                     └── Bouton piéton    ──┘
+Borne 31 (commun) ──┬── Photo-MOSFET piéton ──┬── Borne 32
+                     └── Bouton piéton        ──┘
 ```
 
 Avantages :
-- Pas de GPIO consommé (un bouton poussoir est un contact sec, comme le relais)
+- Pas de GPIO consommé (un bouton poussoir est un contact sec, comme le photo-MOSFET)
 - Fonctionne même si le MCU est hors service (circuit purement électrique)
 - La détection de commande externe (F07/F08) repose sur l'analyse du retour P15, pas sur la lecture des boutons
 
@@ -286,8 +326,8 @@ Avantages :
 
 | GPIO | Pin XIAO | Affectation | Fonction |
 |------|----------|-------------|----------|
-| GPIO3 | D1 | Relais total | F01 — sortie digitale |
-| GPIO4 | D2 | Relais piéton | F02 — sortie digitale |
+| GPIO3 | D1 | Photo-MOSFET total (TLP241A) | F01 — sortie digitale via R = 470 Ω |
+| GPIO4 | D2 | Photo-MOSFET piéton (TLP241A) | F02 — sortie digitale via R = 470 Ω |
 | GPIO5 | D3/A3 | Détection secteur | F03 — entrée ADC ou digitale |
 | GPIO6 | D4 | État portail | F06 — entrée digitale + pull-up |
 | GPIO9 | D9 | Bouton config AP | F04 — bouton BOOT réutilisé |
@@ -323,7 +363,7 @@ Avantages :
 |---|----------|-----------|----------|
 | D1 | ~~Choix MCU~~ → **XIAO ESP32C3** | — | ✅ Décidé |
 | D2 | ~~Méthode détection secteur/batterie~~ → **ADC sur pont diviseur 180 k / 27 k (19/20)** | ✅ Mesures 19/20 + D6 | ✅ Décidé |
-| D3 | Compatibilité module relais avec 3.3V | ✅ D1 | Moyenne |
+| D3 | ~~Compatibilité module relais avec 3.3V~~ → **photo-MOSFET TLP241A** (2× pour F01/F02) | ✅ D1 | ✅ Décidé |
 | D4 | Fréquence clignotement P15=1 | Mesure sur site | Moyenne |
 | D5 | Distinction total/piéton via P15 | Mesure sur site | Basse |
 | D6 | Source d'énergie locale → **super-cap 3 F / 5,5 V** (choix de référence, à valider au prototype) | ✅ Mesure 19/20 | ✅ Décidé (référence) |
@@ -339,3 +379,4 @@ Avantages :
 - [x] Valeur actuelle de P15 et P37 — **P15=6** (bistable temporisé radio, à changer en 1), **P37=0** (cycle total/piéton, OK)
 - [ ] Type de batterie installée (9,6V ou 24V) — code Hc1 ou Hu1 à relever lors du prochain passage sur batterie
 - [ ] Prototype super-cap 3 F : mesurer temps de charge, autonomie réelle en coupure brutale, calibrer filtrage micro-coupures (voir D6)
+- [ ] Caractéristiques électriques contact CBX 30-31 : tension en circuit ouvert, courant en circuit fermé (confirmation compatibilité TLP241A 60 V / 1 A, voir D3)
