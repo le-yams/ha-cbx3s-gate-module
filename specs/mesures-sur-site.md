@@ -9,11 +9,25 @@ Matériel nécessaire : **multimètre**, **chronomètre** (ou téléphone), **st
 
 ### Procédure de lecture (sans modification)
 
-1. Appui long sur **PROG** (~0.5s) → l'écran affiche **P01**
-2. Naviguer avec les touches **+** / **−** jusqu'au paramètre souhaité
-3. La valeur affichée **fixe** = valeur actuellement configurée
-4. **Ne pas appuyer sur OK** (sinon la valeur serait validée/modifiée)
-5. Pour sortir : attendre ~30s sans toucher, l'afficheur revient à l'écran normal (C1)
+Source : notice Somfy §2.4.2 et §7.1.
+
+1. **Appui 0,5 s sur SET** → l'écran affiche **P01** (entrée dans le menu paramétrage)
+2. Naviguer avec **+** / **−** jusqu'au paramètre souhaité
+   - appui bref = défilement paramètre par paramètre
+   - appui maintenu = défilement rapide
+3. Appuyer sur **OK** → la valeur actuelle s'affiche **fixe** → c'est la valeur à relever
+4. **Ne toucher ni à + / − ni à OK** (sinon on entre en modification : la valeur passerait en clignotant)
+5. Pour sortir : **appui 0,5 s sur SET** → retour à l'écran normal (C1)
+
+> ⚠ **SET 0,5 s** ouvre/ferme le menu paramètres (PXX).
+> **SET 2 s** lance l'auto-apprentissage (depuis H0) — à ne pas utiliser.
+> **SET 7 s** efface tous les paramètres — à ne pas utiliser.
+> **PROG 2 s** ouvre le menu de mémorisation des télécommandes (FXX) — à ne pas utiliser ici.
+
+### Lecture de l'affichage (source : notice §7.2)
+
+- **Fixe** = valeur actuellement sélectionnée (ce qu'on veut relever)
+- **Clignotant** = valeur sélectionnable / en cours de modification (pas encore validée)
 
 ### Paramètres à relever
 
@@ -116,11 +130,13 @@ Déclencher une ouverture totale et observer le contact 7/8 :
 
 **Uniquement si P15 n'est pas à 1** et que tu souhaites le modifier sur place.
 
-1. Appui long sur **PROG** (~0.5s) → l'écran affiche **P01**
+Source : notice Somfy §2.4.2 et §7.1.
+
+1. **Appui 0,5 s sur SET** → l'écran affiche **P01**
 2. Naviguer avec **+** / **−** jusqu'à **P15**
-3. Appuyer sur **OK** → la valeur clignote
-4. Utiliser **+** / **−** pour sélectionner **1**
-5. Appuyer sur **OK** pour valider → la valeur arrête de clignoter
-6. Attendre ~30s pour sortir du mode paramétrage
+3. Appuyer sur **OK** → la valeur actuelle s'affiche fixe
+4. Appuyer sur **+** / **−** → la valeur passe en clignotant ; sélectionner **1**
+5. Appuyer sur **OK** pour valider → la valeur redevient fixe (nouvelle valeur enregistrée)
+6. **Appui 0,5 s sur SET** pour sortir du menu paramétrage
 
 > Après modification de P15, refaire un cycle d'ouverture/fermeture pour vérifier le comportement de la sortie 7/8.

@@ -67,66 +67,189 @@ Ce document recense les options techniques envisagées pour réaliser les foncti
 
 ## Détection secteur / batterie (F03)
 
-Deux approches principales. Le module doit rester alimenté via la batterie de secours pour signaler la coupure.
+### Contexte simplifié par les mesures sur site et D6
 
-### Approche TBTS — Surveillance du 24V (bornes 19/20)
+Deux éléments rendent F03 quasi-trivial :
 
-Avantage : tout en basse tension, simple. Inconvénient : la tension 24V reste présente sur batterie, il faut détecter la *variation* de tension.
+1. **Mesure sur site** : les bornes 19/20 passent de ~27 V à **0 V** dès la bascule CBX sur batterie (pas de tension intermédiaire). Le signal à détecter est donc **binaire** (24 V présent ou absent), pas analogique avec seuil fin.
+2. **Décision D6** (super-cap 3 F / 5,5 V) : le module dispose de ~15-30 s d'autonomie après la chute du 24 V → largement de quoi détecter, filtrer les micro-coupures (spec F03 : 2-5 s), publier MQTT, se déconnecter proprement.
 
-#### Option A — Lecture ADC
+Conséquence : **la surveillance directe de 19/20 suffit**. L'ancienne approche "surveillance directe du 230 V sur bornes 1/2" devient inutile (aucun gain fonctionnel pour un surcoût en isolation HT).
 
-- Pont diviseur R1=180kΩ, R2=27kΩ → V_ADC ≈ 3.12V à 24V, courant ~0.116mA
-- Protections : R série 1kΩ + zener 3.6V ou TVS 5V + RC (10kΩ/100nF)
-- Seuil logiciel : ≥23.5V = secteur, <23.0V pendant >3s = batterie
-- Hystérésis logiciel ~0.5V + anti-rebond 2–5s
-- **+** Ultra simple, flexible | **−** Dépend de la précision ADC, nécessite calibration
+### Architecture retenue
 
-#### Option B — Comparateur à hystérésis
+```
+24V (19/20) ──[D1]──┬──[buck 24→5V]──[super-cap 3F]──[buck-boost 5→3,3V]── ESP32-C3
+                    │
+                    └──[pont diviseur + protections]── GPIO (détection)
+```
 
-- Comparateur rail-to-rail (LMV331, TLV3701, MCP6541) + référence (TL431 à 2.50V)
-- Pont diviseur : R1=82kΩ (E12), R2=10kΩ → seuil ~23.5V
-- Rfeedback ≈ 1MΩ pour hystérésis ±0.5V
-- Sortie TOR directe vers GPIO
-- **+** Seuil net, insensible au bruit, pas d'ADC requis | **−** Un CI supplémentaire
+- **D1 (diode Schottky ou MOSFET idéal)** : empêche le super-cap de rétro-alimenter les bornes 19/20 et de fausser la détection. Chute de 0,2-0,4 V acceptable côté buck.
+- **Point de mesure** : en amont de D1 (côté 19/20) pour voir la vraie tension CBX, pas celle maintenue par le super-cap.
 
-#### Option C — Optocoupleur avec seuil zener
+### Deux variantes d'implémentation
 
-- Pont pour ~5–6V à 24V + zener 4.7–5.1V en parallèle LED opto
-- Rlim pour 2–3mA, pull-up 10kΩ vers 3.3V côté transistor
-- **+** Isolation galvanique, sortie TOR propre | **−** Seuil moins précis
+Avec un signal binaire, la précision d'ADC n'est plus critique. Deux options viables :
 
-### Approche 230V — Surveillance directe (bornes 1/2)
+#### Option A — Lecture ADC sur pont diviseur (préférée)
 
-Avantage : détection franche (présent/absent). Inconvénient : manipulation haute tension, isolation obligatoire.
+- Pont diviseur R1 = 180 kΩ, R2 = 27 kΩ → V_ADC ≈ 3,12 V à 24 V, courant ~0,12 mA
+- Protection : TVS 5V (ou zener 3,6 V) + RC (10 kΩ / 100 nF) pour lisser les transitoires
+- Seuil logiciel large : ≥ 10 V = secteur, < 5 V = coupure (marge 5 V autour d'un signal qui transite 27 V ↔ 0 V)
+- Anti-rebond logiciel : confirmer l'état sur 2-5 s (exigence spec F03) avant publication
+- **+** Un seul composant réactif (ADC interne), flexible, diagnostic facile (valeur lue en mV)
+- **−** Utilise 1 pin ADC (GPIO5 déjà prévu)
 
-#### Option 1 — Module détecteur 230V (recommandé)
+#### Option B — Détection TOR par optocoupleur
 
-- Module "AC mains detect" (entrée 85–265VAC, sortie opto isolée 3.3/5V)
-- Entrée → bornes 1/2, sortie → GPIO avec pull-up
-- Mots-clés achat : "AC 230V mains presence detector optocoupler output"
+- 19/20 via résistance de limitation (R ~= 10 kΩ, ~2,3 mA dans la LED opto) vers PC817 ou équivalent
+- Sortie transistor avec pull-up 10 kΩ vers 3,3 V
+- GPIO lit niveau haut (24 V absent) ou bas (24 V présent)
+- **+** Isolation galvanique, signal propre sans traitement, insensible au bruit
+- **−** Un composant de plus, pas de valeur analogique pour diagnostic
 
-#### Option 2 — Mini-relais bobine 230VAC
+**Choix de référence : Option A (ADC)**, pour la simplicité mécanique (un pont diviseur + un TVS) et la visibilité diagnostic. L'isolation galvanique apportée par l'option B n'est pas critique ici : tout est en TBTS sur le même rail GND que 19/20.
 
-- Bobine sur bornes 1/2, contact NO/COM lu en TBTS
-- Ajouter fusible 100–200mA + varistor 275VAC
-- **+** Contact sec, pas d'électronique fine | **−** Conso ~0.3–1W
+### Rejet de l'approche 230V (bornes 1/2)
 
-#### Option 3 — Optocoupleur maison
+L'approche "détection directe du secteur 230 V" était motivée par le fait que 19/20 restait supposément à 24 V sur batterie. La mesure sur site infirme cette hypothèse → l'approche 230 V n'a plus d'intérêt :
 
-- Pont de diodes 600V + 2×330kΩ 0.5W + opto (PC817) + RC filtrage
-- Courant LED opto ~0.5mA, dissipation ~0.2W
-- Fusible + varistor 275VAC côté secteur
-- **+** Très faible conso | **−** Réservé aux habitués (normes, isolement)
+- Mêmes informations (secteur présent ou non) disponibles en TBTS sur 19/20
+- Évite la manipulation de 230 V, les contraintes d'isolation, le fusible/varistor
+- Supprime un câble supplémentaire vers les bornes 1/2
 
-### Conseils transverses
+Conservé uniquement comme alternative documentaire si jamais le comportement de la CBX change (ex : CBX avec 19/20 maintenu partiel sur batterie) : module "AC mains detect" sur 1/2, sortie opto vers GPIO.
 
-- Toujours prendre le signal sur **1/2** (entrée secteur), pas sur 5/6 (sortie éclairage)
-- Filtrage temporel : "secteur perdu" si signal absent >2–5s
-- Mesurer les tensions réelles (secteur vs batterie, repos vs mouvement) avant de fixer les seuils
-- Protéger par TVS 33V côté 24V si environnement bruité
-- Séparer physiquement pistes HT et TBTS
+### Séquence de détection côté firmware
 
-**Statut** : À arbitrer après mesures sur site (tensions réelles 24V secteur vs batterie).
+1. ADC échantillonné périodiquement (ex : 10 Hz) sur GPIO5
+2. État instantané : `secteur` si V > 10 V, `coupure` si V < 5 V, zone morte entre (ignorée)
+3. Filtrage : changement d'état confirmé uniquement si stable sur 2-5 s (anti-rebond micro-coupures)
+4. À la transition `secteur → coupure` confirmée :
+   - Publier MQTT `portail/status/secteur = off` (retained, QoS 1)
+   - Publier état portail courant (snapshot avant extinction)
+   - Déconnexion MQTT et WiFi propres
+   - Deep sleep → le super-cap se vide → extinction
+5. Au démarrage (retour secteur) : publier `portail/status/secteur = on` + état portail courant
+
+### Conseils pratiques
+
+- TVS 33 V côté 19/20 si environnement électriquement bruité (proximité moteurs, flash)
+- Condensateur de découplage 100 nF au plus près de l'ADC
+- Vérifier en prototype que la chute de tension sur 19/20 est franche (pas de plateau intermédiaire au moment de la bascule batterie)
+- Pas de séparation HT/TBTS à gérer puisqu'on reste entièrement en TBTS
+
+**Statut** : Option A (ADC sur pont diviseur 180 k / 27 k) retenue comme référence → clôt **D2**. Seuils et timings à affiner en prototype.
+
+---
+
+## Source d'énergie locale du module (D6)
+
+### Contexte
+
+Les bornes 19/20 passent à **0 V** dès que la CBX bascule sur batterie de secours (mesure sur site confirmée). Sans source d'énergie locale, le module s'éteint brutalement à chaque coupure secteur. Pour réaliser F03 (détection coupure) de façon fiable et publier une notification MQTT explicite, il faut une réserve d'énergie suffisante pour tenir la séquence "last-gasp" avant extinction.
+
+### Options étudiées
+
+| Option | Autonomie coupure | Couvre quoi ? | Complexité | Verdict |
+|--------|-------------------|---------------|------------|---------|
+| Aucune (module meurt) | 0 s | F03 inférée par timeout MQTT (ambigu) | Nulle | Insuffisant pour F03 |
+| **Super-cap 3 F / 5,5 V** | ~15-30 s utiles | F03 explicite + filtrage micro-coupures + disconnect MQTT propre | Faible (un cap + buck-boost) | ✅ **Retenu** |
+| LiPo + TP4056 | Heures | F01/F02/F06/F07/F08 aussi pendant coupure | Moyenne (charge, protection, vieillissement) | Surdimensionné : la box internet est typiquement hors-ligne en même temps |
+
+**Décision** : super-condensateur **3 F / 5,5 V**, à valider en prototype.
+
+### Budget énergie à couvrir (worst-case F03)
+
+| Étape | Durée worst-case | Courant @ 3,3 V |
+|-------|-------------------|------------------|
+| Détection + filtrage anti-rebond (spec F03 : 2-5 s) | 5 s | 40-80 mA (modem-sleep WiFi) |
+| Publish MQTT retained `secteur=off` | 2-3 s (retry TCP) | 150 mA pointe |
+| Publish état final portail + LWT explicite | 1 s | 150 mA |
+| Déconnexion MQTT + WiFi propre | 1 s | 100 mA |
+| Transition deep sleep | <10 ms | — |
+
+**Total worst-case** : ~10 s à 100 mA moyen sur 3,3 V → ~3,3 J côté rail 3,3 V → **~4 J** à fournir côté super-cap (rendement convertisseur ~85 %).
+
+### Formule de dimensionnement
+
+$$E_{utile} = \tfrac{1}{2} \cdot C \cdot (V_{start}^2 - V_{cutoff}^2) \cdot \eta_{conv}$$
+
+Avec $V_{start}$ = 5,0 V (marge sous 5,5 V), $V_{cutoff}$ = 2,0 V (seuil bas buck-boost), $\eta_{conv}$ ≈ 0,85 :
+
+$$E_{utile} \approx 8{,}9 \cdot C \text{ (J, avec C en F)}$$
+
+| Capacité | Énergie utile | Autonomie @ 100 mA/3,3V moy. | Marge worst-case |
+|----------|---------------|------------------------------|------------------|
+| 0,5 F | ~4,5 J | ~14 s | ×1,1 (limite) |
+| 1 F | ~9 J | ~27 s | ×2,3 (minimum viable) |
+| **3 F** | **~27 J** | **~80 s** | **×6,8 (sweet spot)** |
+| 5 F | ~45 J | ~135 s | ×11 (marge confortable) |
+| 10 F | ~89 J | ~270 s | ×22 (surdimensionné) |
+
+### Topologie recommandée
+
+```
+24V (19/20) ──[buck 24→5V]──┬── super-cap 3F/5,5V ──[buck-boost 5→3,3V]── ESP32-C3
+                            │
+                  [R soft-start 10-47Ω + diode idéale/MOSFET PFET]
+```
+
+- **Super-cap sur rail 5 V** : cap unique 5,5 V, pas de stack à équilibrer
+- **Buck-boost en aval** (ex : TPS63020, TPS63900) : extrait ~90 % de l'énergie jusqu'à 2 V en entrée
+- **Soft-start** : résistance + MOSFET idéal qui bypasse une fois chargé, évite l'inrush à la mise sous tension
+- Alternative LDO 3,3V possible mais n'exploite que ~50 % de l'énergie → nécessiterait ~2× plus de capacité
+
+### Fonctionnalités couvertes par cette option
+
+| F | Secteur | Coupure avec super-cap 3F | Coupure sans (module mort) |
+|---|---------|----------------------------|----------------------------|
+| F01/F02 commande MQTT | ✅ | ❌ après ~15-30 s | ❌ dès coupure |
+| **F03 détection coupure** | — | ✅ **notification explicite + filtrage** | ⚠ inférée par timeout MQTT |
+| F04 config AP | ✅ | n/a | n/a |
+| F05 boutons externes | ✅ | ✅ (câblés direct CBX) | ✅ |
+| F06 état portail | ✅ | ❌ après ~15-30 s | ❌ dès coupure |
+| F07/F08 notif. sources ext. | ✅ partiel | ❌ pendant coupure | ❌ pendant coupure |
+
+Autrement dit, le super-cap ne prolonge pas la disponibilité du module pendant une coupure : il permet uniquement une **notification propre** avant extinction, et le **filtrage des micro-coupures** qui sinon provoqueraient des reboot répétés.
+
+### Limitations acceptées
+
+1. **Trou d'observation pendant la coupure** : si le portail est manipulé (télécommande radio, bouton filaire) pendant la coupure, HA ne le saura jamais. Au retour secteur, le module reboote et publie l'état *courant* lu sur 7/8, sans historique.
+2. **F01/F02/F06/F07/F08 indisponibles pendant la coupure prolongée** (au-delà des ~15-30 s de super-cap).
+3. **Pas de resynchronisation "à la volée"** : si la coupure dure > autonomie super-cap, le module crashe brutalement (à la fin).
+
+Ces limitations sont acceptées car, pendant une coupure secteur, la box internet et le routeur WiFi sont typiquement eux aussi hors-ligne — même avec un LiPo, le module n'aurait personne à qui parler en MQTT. Le "last-gasp" juste avant extinction est donc la meilleure valeur accessible.
+
+### Contraintes pratiques
+
+- **ESR** : privilégier < 200 mΩ. Les pics WiFi (~300-400 mA) génèrent sinon une chute de tension gênante.
+- **Fuite** : 5-15 µA typique pour 3 F / 5,5 V → absorbée par le buck en régime nominal, invisible.
+- **Temps de charge initial** : à ~50 mA via soft-start → $3 \cdot 5 / 0{,}05$ ≈ **5 min** à la première mise sous tension.
+- **Durée de vie** : calendaire 10-15 ans à 25 °C, cyclage > 500 000 cycles → largement supérieur à la durée du projet.
+- **Encombrement** : radial Ø12-14 mm × H25 mm typique → à prévoir dans le dessin du boîtier.
+
+### Composants candidats
+
+| Référence | Capa / V | ESR | Format | Prix ind. |
+|-----------|----------|-----|--------|-----------|
+| **EATON PHV-5R4H305-R** | 3 F / 5,4 V | 85 mΩ | Radial Ø12,5×25 mm | ~3 € |
+| **Panasonic EECS5R5H305** | 3 F / 5,5 V | 100 mΩ | Radial Ø13,5×25 mm | ~4 € |
+| Vinatech VEC5R5107QG | 10 F / 5,5 V | 75 mΩ | Radial Ø21×45 mm | ~7 € |
+| Maxwell BCAP0003 (stack 2×2,7 V) | 3 F / 5,4 V | < 100 mΩ | Plus compact, équilibrage requis | ~5 € |
+
+Buck-boost candidat : **TPS63020** (0,5-5,5 V in, 1,2-5,5 V out, 96 % de rendement pic) ou **TPS63900** (ultra-low Iq pour extraire un maximum d'énergie).
+
+### Protocole de validation en prototype
+
+1. Charger le cap avec 24 V présent → mesurer temps de charge effectif
+2. Couper brutalement le 24 V → mesurer le temps réel avant brownout de l'ESP32-C3
+3. Instrumenter le firmware : horodater chaque étape (détection, publish, MQTT ACK, disconnect)
+4. Vérifier que le worst-case (WiFi déconnecté, reconnect, publish, disconnect) tient dans la fenêtre
+5. Mesurer à vide (modem-sleep) vs en activité WiFi pour caler l'estimation
+6. Si 3 F trop juste → passer à 5 F (même footprint radial, sans redesign) ; si largement excédentaire → redescendre à 1 F
+
+**Statut** : Choix de référence **3 F / 5,5 V**. À valider / ajuster au prototypage.
 
 ---
 
@@ -137,7 +260,7 @@ Avantage : détection franche (présent/absent). Inconvénient : manipulation ha
 | Commande ouverture totale | 30 + 31 | Contact sec (relais) | 1 sortie digitale |
 | Commande ouverture piéton | 32 + 31 | Contact sec (relais) | 1 sortie digitale |
 | État portail (P15=1) | 7 + 8 | Contact sec (lecture) | 1 entrée digitale + pull-up |
-| Alimentation module | 19 + 20 | 24V DC | Via buck → 3.3V |
+| Alimentation module | 19 + 20 | 24V DC (secteur uniquement — 0V sur batterie) | Buck 24→5V + super-cap 3F/5,5V + buck-boost 5→3,3V (voir D6) |
 | Détection secteur | 1/2 ou 19/20 | Selon option | 1 entrée (digitale ou ADC) |
 | Boutons externes total/piéton | 30/32 + 31 | Contact sec | Aucun (câblage direct) |
 | Bouton config AP (F04) | — | Bouton poussoir | Bouton BOOT (GPIO9) |
@@ -199,18 +322,20 @@ Avantages :
 | # | Décision | Dépend de | Priorité |
 |---|----------|-----------|----------|
 | D1 | ~~Choix MCU~~ → **XIAO ESP32C3** | — | ✅ Décidé |
-| D2 | Méthode détection secteur/batterie | Mesures sur site | Haute |
+| D2 | ~~Méthode détection secteur/batterie~~ → **ADC sur pont diviseur 180 k / 27 k (19/20)** | ✅ Mesures 19/20 + D6 | ✅ Décidé |
 | D3 | Compatibilité module relais avec 3.3V | ✅ D1 | Moyenne |
 | D4 | Fréquence clignotement P15=1 | Mesure sur site | Moyenne |
 | D5 | Distinction total/piéton via P15 | Mesure sur site | Basse |
+| D6 | Source d'énergie locale → **super-cap 3 F / 5,5 V** (choix de référence, à valider au prototype) | ✅ Mesure 19/20 | ✅ Décidé (référence) |
 
 ## Mesures à réaliser sur site
 
-- [ ] Tension bornes 19/20 en fonctionnement normal (secteur)
-- [ ] Tension bornes 19/20 en fonctionnement batterie
-- [ ] Tension bornes 19/20 pendant un mouvement du portail
-- [ ] Signal sur bornes 7/8 (P15=1) : niveaux, fréquence de clignotement, durée
-- [ ] Signal P15=1 lors d'une ouverture totale vs piéton (différence ?)
+- [x] Tension bornes 19/20 en fonctionnement normal (secteur) — **27 à 27,5 V** au repos, **26,2 à 27,5 V** pendant un mouvement (variation selon sollicitation vérins)
+- [x] Tension bornes 19/20 en fonctionnement batterie — **0 V** (sortie coupée par la CBX)
+- [x] Tension bornes 19/20 pendant un mouvement du portail (secteur) — voir ci-dessus
+- [ ] Signal sur bornes 7/8 (P15=1) : niveaux, fréquence de clignotement, durée — à faire après passage P15 de 6 à 1
+- [ ] Signal P15=1 lors d'une ouverture totale vs piéton (différence ?) — à faire après passage P15=1
 - [ ] Couverture WiFi au niveau du boîtier CBX
-- [ ] Valeur actuelle de P15 et P37
-- [ ] Type de batterie installée (9,6V ou 24V)
+- [x] Valeur actuelle de P15 et P37 — **P15=6** (bistable temporisé radio, à changer en 1), **P37=0** (cycle total/piéton, OK)
+- [ ] Type de batterie installée (9,6V ou 24V) — code Hc1 ou Hu1 à relever lors du prochain passage sur batterie
+- [ ] Prototype super-cap 3 F : mesurer temps de charge, autonomie réelle en coupure brutale, calibrer filtrage micro-coupures (voir D6)

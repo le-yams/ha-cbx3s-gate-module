@@ -78,7 +78,7 @@ Sources : `5128270bcontrol_box_3s_io-fr-en-tr-ar.pdf`, `aidememoire_cbx_3s_io.pd
 | 20    | 0V (GND) |
 
 - Alimente cellules photo, capteurs, accessoires TBTS
-- **Reste disponible sur batterie de secours**
+- ⚠ **Coupé sur batterie de secours** (mesure sur site : 0V au repos ET en mouvement, batterie fonctionnelle par ailleurs). Les périphériques TBTS branchés sur 19/20 ne sont donc **pas alimentés** pendant une coupure secteur.
 
 ### Cellules photoélectriques (sécurité)
 
@@ -134,12 +134,41 @@ Sources : `5128270bcontrol_box_3s_io-fr-en-tr-ar.pdf`, `aidememoire_cbx_3s_io.pd
 | 5 | Impulsionnel piloté radio | Impulsion à chaque activation radio |
 | 6 | Bistable temporisé piloté radio | Activation radio, désactivation auto après P16 × 10s |
 
-### Lecture du paramétrage actuel (sans modification)
+### Fonctions des touches (source : notice Somfy §2.4.2)
 
-1. Appui long sur **PROG** → afficheur indique P01
-2. Naviguer avec +/− jusqu'à P15
-3. Lire la valeur affichée
-4. Ne pas valider → sortir en laissant revenir à l'affichage normal
+| Touche       | Action                                                                                   |
+|--------------|------------------------------------------------------------------------------------------|
+| SET (0,5 s)  | Entrée **et** sortie du menu paramétrage (PXX)                                           |
+| SET (2 s)    | Déclenchement de l'auto-apprentissage (depuis H0)                                        |
+| SET (7 s)    | Effacement de l'auto-apprentissage et des paramètres (reset)                             |
+| + / −        | Navigation dans la liste des paramètres (appui bref = pas à pas, maintenu = rapide) ; en mode valeur : modification de la valeur |
+| OK           | Validation de la sélection d'un paramètre ; validation de la valeur ; lancement auto-apprentissage (depuis H1) ; marche forcée |
+| PROG (2 s)   | Mémorisation des télécommandes (menu FXX)                                                |
+| PROG (7 s)   | Effacement de toutes les télécommandes                                                   |
+
+### Affichage de la valeur d'un paramètre (source : notice §7.2)
+
+- **Fixe** : valeur actuellement sélectionnée pour ce paramètre (lecture).
+- **Clignotant** : valeur sélectionnable, en cours de choix (pas encore validée).
+
+### Lecture d'un paramètre (sans modification)
+
+1. Appui **0,5 s sur SET** → l'afficheur affiche **P01**
+2. Naviguer avec **+ / −** (appui bref pas à pas, maintenu pour défilement rapide) jusqu'au paramètre souhaité (ex : P15)
+3. Appuyer sur **OK** → la valeur actuelle s'affiche **fixe**
+4. Ne toucher ni à **+ / −** (ça passerait en modification clignotante), ni à **OK** (revient au nom du paramètre)
+5. Sortir du menu par un **appui 0,5 s sur SET**
+
+### Modification d'un paramètre (ex : passer P15 de 6 à 1)
+
+1. Appui **0,5 s sur SET** → P01
+2. **+ / −** jusqu'à **P15**
+3. **OK** → valeur actuelle affichée fixe
+4. **+ / −** → la valeur devient clignotante ; sélectionner la nouvelle valeur (1)
+5. **OK** → la valeur devient fixe (validée)
+6. Appui **0,5 s sur SET** → sortie du menu paramétrage
+
+> ⚠ Ne pas confondre **SET** (menu paramètres PXX) et **PROG** (menu télécommandes FXX).
 
 ---
 
@@ -161,8 +190,8 @@ Sources : `5128270bcontrol_box_3s_io-fr-en-tr-ar.pdf`, `aidememoire_cbx_3s_io.pd
   - **Batterie 24V** → code afficheur **Hu1**
 - En mode batterie :
   - Logique de commande + radio io : **opérationnels**
-  - Sortie 24V (bornes 19/20) : **disponible** (tension réelle peut varier selon le type de batterie)
-  - Cellules photo (21/23/24) : **disponibles**
+  - Sortie 24V (bornes 19/20) : **coupée** (0V mesuré sur site, au repos comme en mouvement)
+  - Cellules photo (21/23/24) : comportement à vérifier si utilisées (probablement alimentées uniquement pendant un cycle)
   - Sortie éclairage 230V (bornes 5/6) : **indisponible**
   - Feu clignotant (bornes 17/18) : **indisponible** (230V)
 - **Aucune sortie native ne signale le passage sur batterie**
