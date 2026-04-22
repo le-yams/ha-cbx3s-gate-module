@@ -11,7 +11,7 @@ Module électronique à concevoir pour piloter et superviser un portail battant 
 ## Prochaines étapes
 
 1. **Session sur site** — passage P15 de 6 à 1, mesure signal 7/8, caractéristiques bornes 30/31, couverture WiFi → clôture D4/D5 et checklist architecture bloc
-2. **Conception matérielle** — schéma électronique, BOM détaillée, PCB, boîtier (architecture bloc déjà figée dans `specs/etude-faisabilite.md` §« Architecture bloc consolidée »)
+2. **Conception matérielle** — schéma électronique, BOM détaillée, PCB, boîtier (architecture bloc déjà figée dans `specs/architecture-bloc.md`)
 3. **Prototype super-cap** — valider temps de charge, autonomie réelle en coupure brutale, filtrage micro-coupures
 4. **Implémentation firmware** — découpage en tâches à partir du MVP (F01–F06)
 5. **Fonctionnalités optionnelles** — F07–F08, après MVP fonctionnel
@@ -34,7 +34,8 @@ docs/                           Documentation technique de référence
   *.pdf                          Notices officielles Somfy (Control Box, aide-mémoire)
 specs/                          Spécifications et étude
   besoins-fonctionnels.md       Cas d'usage MVP et optionnels, contraintes
-  etude-faisabilite.md          Options techniques, décisions figées, architecture bloc consolidée
+  etude-faisabilite.md          Options techniques, décisions figées, justifications D1–D6
+  architecture-bloc.md          Architecture bloc consolidée — référence pour la conception matérielle
   mesures-sur-site.md           Procédures de relevé CBX (paramètres PXX, tensions, signaux)
 ```
 
